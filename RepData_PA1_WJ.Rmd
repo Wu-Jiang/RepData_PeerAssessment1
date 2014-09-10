@@ -1,88 +1,98 @@
 ---
-title: "RepData_PA1_WJ"
+title: "Pay Attention to Your Daily Activity Pattern"
+author: "Jiang Wu"
+date: "09/09/2014"
 output: html_document
 ---
-
-This is my R Markdown document for Peer Assessment 1 of the Reproducible Research Course provided by JHU
-
 ### Setting Global Options
 ```{r setoptions, echo=TRUE}
 library(knitr)
+library(ggplot2)
+library(grid)
+library(gridExtra)
 opts_chunk$set(echo=TRUE)
+library(hash)
 ``` 
 
+###Introduction
+With the availability of activity monitoring devices such as [Fitbit][1], [Jawbone][3] or the coming [Apple Watch][3], people's activity patterns can be tracked and analyzed. 
 
+[1]: http://www.fitbit.com/ "Fitbit"
+[2]: https://jawbone.com/up "Jawbone"
+[3]: http://www.apple.com/watch/?cid=wwa-us-kwg-watch-com "Apple Watch"
 
-###Loading Data
+In this peer assessment project,we are provided with a raw dataset collected by such devices at 5 minutes interval throughout a two-month time period. The learning objectives include:
+
+* Mean total number of steps taken per day 
+* Average daily activity pattern 
+* Re-calculate mean total number of steps taken per day by imputing the missing values
+* Identifying the differences in activity patterns between weekdays and weekends
+
+###Data Processing 
 Here, we're going to load the activity monitoring data.
-```{r loaddata}
+```{r dataprocess}
 unzip("./activity.zip",exdir = ".")
 activity<-read.csv("./activity.csv")
+#remove the missing values
+activity_new<-activity[complete.cases(activity),]
 ```
 
 
 
 ### Mean Total Number of Steps Taken per Day
-First, get rid of the missing value in the dataset
-```{r }
-activity_new<-activity[complete.cases(activity),]
-```
-
-Secondly, summarize the total steps taken on each day and make a histogram
-```{r }
+Summarize the total steps taken on each day and make a histogram
+```{r meantotal_hist}
 daily_step<-aggregate( steps ~ date, data=activity_new, FUN=sum)
-hist(daily_step$steps, col="blue",breaks=10, main="Steps Taken Per Day", xlab="Steps")
-```
-
-Then, calculate the mean and median of the total steps
-```{r }
+qplot(steps,data=daily_step,geom="histogram",main="Steps Taken Per Day",
+      ylab="Frequency")
 mean_steps<-mean(daily_step$steps)
 median_steps<-median(daily_step$steps)
 ```
-The mean of total steps taken per day is `r mean_steps`.  The median of total steps taken per day is `r median_steps`
+
+If we exclude all the **NA** values, the mean of total steps taken per day is calculated as **`r mean_steps`**.  The median of total steps taken per day is **`r median_steps`**.
 
 
 
-### Average Daily Activity Pattern and Make a Histogram
+### Average Daily Activity Pattern 
 Average the steps based on intervals, i.e steps taken in each five minutes
-```{r }
+```{r daily activity}
 interval_step<-aggregate( steps ~ interval, data=activity_new, FUN="mean")
-plot(interval_step$interval, interval_step$steps,col="blue", main="Steps Taken in Each Five Minutes", 
-     xlab="Five Minutes Interval",ylab="Avg Steps in Each Five Minutes", type="l")
+qplot(interval,steps, data=interval_step,geom="line",
+      main="Steps Taken in Each Five Minutes", 
+      xlab="Five Minutes Interval", ylab="Avg Steps in Each Five Minutes")     
+    
 ```
+
 
 Find the interval with maximum steps across all the  days
 ```{r}
 maximum_step<-max(interval_step$steps)
 for (i in 1:nrow(interval_step)){
   if (interval_step[i,2]==maximum_step){
-    maximum_interval<-interval_step[i,1]
+    maximum_interval<-interval_step[i,1]    
   }
 }
 ```
-The 5-minute interval with maximum steps is `r maximum_interval`
+The 5-minute interval with maximum steps (`r maximum_step`) is `r maximum_interval`
 
 
 
 ### Imputing Missing Values
 Calculate the total number of missing values in the dataset
-```{r}
+```{r num_NA}
 missing_number<-nrow(activity)-nrow(activity_new)
 ```
-The total number of rows with NAs is `r missing_number`
+The total number of rows with NAs is **`r missing_number`**
 
 Create a new dataset with filled missing values. 
-Here, I use the mean of the steps taken in 5-minutes intervals as the replacement for the missing data
-```{r}
+Here, I use the mean of the steps taken in 5-minutes intervals as the replacement for the missing data. 
+```{r imputing NA}
 activity_fill<-activity
-library(hash)
 h<-hash(keys=interval_step$interval,values=interval_step$steps)
-for (i in 1:nrow(activity_fill)){
-  
+for (i in 1:nrow(activity_fill)){  
   if (is.na(activity_fill[i,1])){
     hash_key<-as.character(activity_fill[i,3])
-    activity_fill[i,1]<-as.numeric(h[[hash_key]])
-    
+    activity_fill[i,1]<-as.numeric(h[[hash_key]])   
   }
 }
 ```
@@ -90,19 +100,23 @@ for (i in 1:nrow(activity_fill)){
 Then, make a histogram of the total number of steps taken each day with filled values
 ```{r}
 daily_step_fill<-aggregate( steps ~ date, data=activity_fill, FUN=sum)
-hist(daily_step_fill$steps, col="blue",breaks=10, main="Steps Taken Per Day", xlab="Steps")
+qplot(steps,data=daily_step_fill,geom="histogram",main="Steps Taken Per Day",ylab="Frequency")
 ```
+
 
 Calculate the new mean and new median of the total steps
 ```{r fig.width=10 }
 mean_steps_filled<-mean(daily_step_fill$steps)
 median_steps_filled<-median(daily_step_fill$steps)
-par(mfrow=c(1,2))
-hist(daily_step$steps, col="blue",breaks=10, main="Steps Taken Per Day-Before Imputation", xlab="Steps")
-hist(daily_step_fill$steps, col="blue",breaks=10, main="Steps Taken Per Day-After Imputation", xlab="Steps")
+p1<-qplot(steps,data=daily_step,geom="histogram",main="Steps Taken Per Day-Before Imputation",
+          ylab="Frequency")
+p2<-qplot(steps,data=daily_step_fill,geom="histogram",main="Steps Taken Per Day-After Imputation",
+          ylab="Frequency")
+grid.arrange(p1, p2,ncol=2)
 ```
 
-The new mean of total steps taken per day is `r mean_steps_filled`.  The new median of total steps taken per day is `r median_steps_filled`. Compare the histogram side by side, it seems that the imputation doesn't impact the mean and median values much (only one step increase in median value) and the general distribution shape has been preserved. However, after the imputation, the missing dates have been filled averaged value and the variance of the total daily steps has been reduced. 
+
+The new mean of total steps taken per day is **`r mean_steps_filled`**.  The new median of total steps taken per day is **`r median_steps_filled`**. Compare the histogram side by side, it seems that the imputation doesn't impact the mean and median values much (only **1 step** increase in median value) and the general distribution shape has been preserved. However, after the imputation, since the missing dates have been filled with averaged value and the **variance of the total daily steps has been reduced**. 
 
 
 
@@ -110,9 +124,8 @@ The new mean of total steps taken per day is `r mean_steps_filled`.  The new med
 ### Activity Patterns in Weekdays and Weekends
 
 First, create a new factor variable in the dataset indicating whether a given date is a weekday or weekend day
-```{r}
+```{r week}
 activity_fill$date<-as.Date(activity_fill$date)
-
 for(i in 1:nrow(activity_fill)){
   if((weekdays(activity_fill[i,2])=="Saturday")||(weekdays(activity_fill[i,2])=="Sunday")){
     activity_fill[i,4]="Weekend"
@@ -126,11 +139,10 @@ head(activity_fill,3)
 ```
 
 Make a panel plot containing a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis)
-```{r}
+```{r weeklypattern}
 interval_step_week<-aggregate( steps ~ interval+week, data=activity_fill, FUN="mean")
-library(ggplot2)
 g<-ggplot(interval_step_week,aes(interval,steps))
-g+geom_line(color="steelblue",size=0.7)+facet_grid(.~week)
+g+geom_line(color="steelblue",size=0.75)+facet_grid(.~week)
 ```
 
-Based on the panel plot, it can be inferred that this person has more activities in weekdays than that in weekends
+Based on the panel plot, it can be inferred that this person is generally taking more steps in weekdays than in weekends, especially around 10:00am in the morning. However, his or her activities are more evenly distributed in weekend, indicating he or she may participat in more kinds of activities in weekend.
